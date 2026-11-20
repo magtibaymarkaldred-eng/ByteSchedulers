@@ -1,0 +1,8 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "Run GUI",   "type": "debugpy", "request": "launch", "program": "${workspaceFolder}/cpu_scheduler.py", "console": "integratedTerminal" },
+    { "name": "Run CLI",   "type": "debugpy", "request": "launch", "program": "${workspaceFolder}/cpu_scheduler.py", "args": ["--cli"], "console": "integratedTerminal" },
+    { "name": "Run Tests", "type": "debugpy", "request": "launch", "module": "unittest", "args": ["-v", "test_cpu_scheduler"], "console": "integratedTerminal" }
+  ]
+}
