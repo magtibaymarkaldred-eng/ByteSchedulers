@@ -1,140 +1,140 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+"""Modern browser interface for the CPU Scheduling Simulator.
+
+Uses only the Python standard library. The scheduling is computed by
+cpu_scheduler.py (Python); the browser only draws the results.
+"""
+import json
+import threading
+import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from cpu_scheduler import (Process, validate, fcfs, sjf, srtf, round_robin)
+
+HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPU Scheduling Simulator</title>
+<style>
+:root{
+  --bg:#f4f5fb; --card:#ffffff; --ink:#1d2140; --muted:#6b7090; --line:#e6e8f2;
+  --brand:#c8102e; --brand2:#ff5a3c; --accent:#4f46e5; --good:#12a56b; --shadow:0 8px 30px rgba(40,44,90,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+header{background:linear-gradient(120deg,var(--brand),var(--brand2));color:#fff;padding:26px 24px 70px}
+.wrap{max-width:1100px;margin:0 auto}
+header h1{margin:0;font-size:26px;letter-spacing:.2px}
+header p{margin:4px 0 0;opacity:.9}
+.badge{display:inline-block;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:99px;font-size:12px;margin-bottom:8px}
+main{margin-top:-48px;padding:0 16px 40px}
+.card{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
+.card h2{margin:0 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1.5fr;gap:18px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{border:2px solid var(--line);background:#fff;border-radius:12px;padding:11px 8px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s}
+.seg button small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.seg button:hover{border-color:#c9cdf5}
+.seg button.on{border-color:var(--accent);background:#eef0ff;color:var(--accent)}
+.seg button.on small{color:var(--accent)}
+.seg .wide{grid-column:span 2}
+label{font-size:13px;color:var(--muted);font-weight:600}
+input[type=number],input[type=text]{width:100%;padding:9px 10px;border:2px solid var(--line);border-radius:10px;font:inherit;color:var(--ink);background:#fff;transition:.15s}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px #e3e5ff}
+.q{margin-top:14px;display:none}
+.q.show{display:block}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);text-align:center;padding:8px 6px;border-bottom:2px solid var(--line)}
+td{padding:6px;text-align:center;border-bottom:1px solid var(--line)}
+td input{text-align:center;padding:7px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.btn{border:0;border-radius:12px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer;transition:.15s}
+.btn.primary{background:linear-gradient(120deg,var(--accent),#7c6cf0);color:#fff;box-shadow:0 6px 16px rgba(79,70,229,.35)}
+.btn.primary:hover{transform:translateY(-1px)}
+.btn.ghost{background:#f0f1fa;color:var(--ink)}
+.btn.ghost:hover{background:#e5e7f6}
+.btn.x{background:none;color:#c0344b;padding:4px 10px;font-size:18px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.bar .grow{flex:1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.stat{background:linear-gradient(160deg,#fff,#f5f6ff);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+.stat b{display:block;font-size:26px;color:var(--accent)}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.gscroll{overflow-x:auto;padding-bottom:8px}
+.gantt{display:flex;position:relative;height:56px}
+.blk{height:56px;display:flex;align-items:center;justify-content:center;color:#1d2140;font-weight:700;border-right:2px solid #fff;position:relative;overflow:hidden;
+  animation:grow .5s ease both;transform-origin:left}
+.blk.idle{background:repeating-linear-gradient(45deg,#eceef6,#eceef6 6px,#dfe2f0 6px,#dfe2f0 12px);color:var(--muted);font-weight:500;font-size:12px}
+.blk:first-child{border-radius:10px 0 0 10px}.blk:last-child{border-radius:0 10px 10px 0;border-right:0}
+@keyframes grow{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+.ticks{position:relative;height:22px;margin-top:4px}
+.tick{position:absolute;transform:translateX(-50%);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.res td,.res th{padding:9px 8px}
+.res tbody tr:hover{background:#f7f8ff}
+.pid{font-weight:700}
+.sect-title{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.sect-title h3{margin:0;font-size:19px}
+.pill{background:#eef0ff;color:var(--accent);padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.cmp-row{display:grid;grid-template-columns:170px 1fr 60px;gap:10px;align-items:center;margin:6px 0}
+.cmp-bar{height:14px;border-radius:99px;background:#eceef8;overflow:hidden}
+.cmp-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),#8f84f5);transition:width .6s}
+.cmp-bar i.best{background:linear-gradient(90deg,var(--good),#53d6a0)}
+.cmp-row span:last-child{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.note{background:#fff8e6;border:1px solid #ffe3a3;border-radius:12px;padding:12px 14px;color:#6a5313;font-size:14px}
+.empty{text-align:center;color:var(--muted);padding:30px}
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,80px);background:#2b2f55;color:#fff;padding:12px 20px;border-radius:12px;box-shadow:var(--shadow);opacity:0;transition:.3s;max-width:90vw;z-index:9}
+#toast.show{transform:translate(-50%,0);opacity:1}
+#toast.err{background:#c0344b}
+#toast.ok{background:var(--good)}
+h4{margin:20px 0 8px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.7px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <span class="badge">PT 101 · Platform Technologies</span>
+  <h1>CPU Scheduling Simulator</h1>
+  <p>FCFS · SJF · SRTF · Round Robin — type your processes, press Run, and see the Gantt chart.</p>
+</div></header>
+
+<main><div class="wrap">
+  <div class="grid">
+    <section class="card">
+      <h2>1 · Choose algorithm</h2>
+      <div class="seg" id="algos">
+        <button data-a="fcfs" class="on">FCFS<small>First Come First Served</small></button>
+        <button data-a="sjf">SJF<small>Non-preemptive</small></button>
+        <button data-a="srtf">SRTF<small>Preemptive</small></button>
+        <button data-a="rr">Round Robin<small>Time quantum</small></button>
+        <button data-a="all" class="wide">⚖ Compare All Algorithms</button>
+      </div>
+      <div class="q" id="qbox">
+        <label for="quantum">Time quantum</label>
+        <input type="number" id="quantum" min="1" value="3">
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2 · Process information</h2>
+      <table id="ptable">
+        <thead><tr><th></th><th>Process ID</th><th>Arrival Time</th><th>Burst Time</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="bar">
+        <button class="btn ghost" id="add">＋ Add process</button>
+        <button class="btn ghost" id="sample">Load sample</button>
+        <button class="btn ghost" id="random">🎲 Random</button>
+        <button class="btn ghost" id="clear">Clear</button>
+        <span class="grow"></span>
+        <button class="btn primary" id="run">▶ Run Simulation</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="output"><div class="card empty">Results will appear here. Press <b>Run Simulation</b> (or hit <b>Enter</b>).</div></div>
+</div></main>
+<div id="toast"></div>
 
 <script>
 const COLORS=["#a5d8ff","#b2f2bb","#ffd8a8","#ffc9c9","#d0bfff","#fff3bf","#99e9f2","#fcc2d7","#c0eb75","#e5dbff"];
