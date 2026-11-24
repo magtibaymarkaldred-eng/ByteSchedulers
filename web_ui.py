@@ -232,3 +232,127 @@ function draw(data){
 }
 $("#sample").click();
 </script>
+
+</body>
+</html>
+"""
+
+def _result_dict(r):
+    return {
+        "name": r.name,
+        "quantum": r.quantum,
+        "timeline": [list(t) for t in r.timeline],
+        "trace": [list(t) for t in r.rr_trace],
+        "processes": [dict(pid=p.pid, at=p.at, bt=p.bt, ct=p.ct, tat=p.tat, wt=p.wt, rt=p.rt)
+                      for p in r.processes],
+        "avg": {"tat": r.avg_tat, "wt": r.avg_wt, "rt": r.avg_rt},
+    }
+
+
+def _to_int(value, label):
+    try:
+        text = str(value).strip()
+        if text == "":
+            raise ValueError
+        return int(text)
+    except ValueError:
+        raise ValueError(f"{label} must be a whole number.")
+
+
+def simulate(payload):
+    """Run the chosen algorithm(s). Returns a JSON-ready dict or raises ValueError."""
+    procs = []
+    for k, row in enumerate(payload.get("processes", []), start=1):
+        pid = str(row.get("pid", "")).strip()
+        label = pid or f"row {k}"
+        procs.append(Process(pid, _to_int(row.get("at"), f"{label}: arrival time"),
+                             _to_int(row.get("bt"), f"{label}: burst time")))
+    algo = payload.get("algorithm", "fcfs")
+    quantum = None
+    if algo in ("rr", "all"):
+        quantum = _to_int(payload.get("quantum"), "Time quantum")
+    validate(procs, quantum)
+
+    if algo == "fcfs":
+        results = [fcfs(procs)]
+    elif algo == "sjf":
+        results = [sjf(procs)]
+    elif algo == "srtf":
+        results = [srtf(procs)]
+    elif algo == "rr":
+        results = [round_robin(procs, quantum)]
+    elif algo == "all":
+        results = [fcfs(procs), sjf(procs), srtf(procs), round_robin(procs, quantum)]
+    else:
+        raise ValueError("Unknown algorithm.")
+
+    out = {"results": [_result_dict(r) for r in results], "comparison": None}
+    if algo == "all":
+        bw = min(results, key=lambda r: r.avg_wt)
+        bt = min(results, key=lambda r: r.avg_tat)
+        br = min(results, key=lambda r: r.avg_rt)
+        out["comparison"] = (
+            f"Lowest waiting time: <b>{bw.name}</b> ({bw.avg_wt:.2f}). "
+            f"Lowest turnaround time: <b>{bt.name}</b> ({bt.avg_tat:.2f}). "
+            f"Lowest response time: <b>{br.name}</b> ({br.avg_rt:.2f}). "
+            "SJF/SRTF favor short jobs, FCFS is simple but can cause the convoy effect, "
+            "and Round Robin shares the CPU fairly and improves response time at the cost "
+            "of more context switches.")
+    return out
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def _send(self, code, body, ctype):
+        data = body.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path in ("/", "/index.html"):
+            self._send(200, HTML, "text/html; charset=utf-8")
+        else:
+            self._send(404, "Not found", "text/plain")
+
+    def do_POST(self):
+        if self.path != "/api/run":
+            return self._send(404, "Not found", "text/plain")
+        try:
+            size = int(self.headers.get("Content-Length", 0))
+            payload = json.loads(self.rfile.read(size) or b"{}")
+            self._send(200, json.dumps(simulate(payload)), "application/json")
+        except ValueError as e:
+            self._send(400, json.dumps({"error": str(e)}), "application/json")
+        except Exception as e:  # never crash the server on bad input
+            self._send(500, json.dumps({"error": f"Unexpected error: {e}"}), "application/json")
+
+
+def serve(port=8765, open_browser=True):
+    server = None
+    for p in range(port, port + 20):
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", p), Handler)
+            break
+        except OSError:
+            continue
+    if server is None:
+        raise OSError("No free port found.")
+    url = f"http://127.0.0.1:{server.server_address[1]}"
+    print(f"CPU Scheduling Simulator running at {url}\nPress Ctrl+C to stop.")
+    if open_browser:
+        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    serve()
