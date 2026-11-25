@@ -1,6 +1,17 @@
 <p align="center">
   <img src="banner-byte-schedulers.svg" alt="Byte Schedulers - CPU Scheduling Simulator" width="100%">
 </p>
+# Team Assignments and Commit Plan
+
+Roles are from `team-assignments.png`.
+
+| Member | Role | Owns |
+|---|---|---|
+| Ezekiel Lazaro | Project Manager / Fullstack | Repo setup, README, tests, CLI, tkinter window, merging |
+| Mark Aldred Magtibay | Backend | Data model, validation, FCFS, SJF, SRTF (`cpu_scheduler.py`) |
+| Red Sepillo | Backend | Round Robin, run_all, `simulate()`, HTTP server (`web_ui.py`) |
+| Stephen Andre Glovo | Frontend | HTML layout and CSS in `web_ui.py` |
+| Hannah Catapang | Frontend | JavaScript, Gantt chart and results display in `web_ui.py` |
 
 # CPU Scheduling Simulator (PT 101 - Topic 2)
 FCFS, SJF (non-preemptive), SRTF (preemptive), Round Robin. Python 3.9+, no extra installs.
