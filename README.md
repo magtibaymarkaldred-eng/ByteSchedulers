@@ -17,7 +17,7 @@ Roles are from `team-assignments.png`.
 FCFS, SJF (non-preemptive), SRTF (preemptive), Round Robin. Python 3.9+, no extra installs.
 
 ## Run in VS Code
-1. File > Open Folder... > this folder. Install the **Python** extension.
+1. File > Open Folder.... > this folder. Install the **Python** extension.
 2. Press **F5** and pick *Run GUI*, *Run CLI* or *Run Tests*
    (or in the terminal: `python cpu_scheduler.py`, `python cpu_scheduler.py --cli`,
    `python -m unittest -v test_cpu_scheduler`).
