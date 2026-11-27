@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 
 # ----------------------------------------------------------------------
-# DATA MODEL
+# DATA MODELS
 # ----------------------------------------------------------------------
 @dataclass
 class Process:
